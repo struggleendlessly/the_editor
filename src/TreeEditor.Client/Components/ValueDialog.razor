@@ -1,0 +1,42 @@
+<MudDialog>
+    <DialogContent>
+        <form id="value-form" @onsubmit="Submit">
+            <MudTextField @bind-Value="_text" Label="Value" MaxLength="NodeDto.MaxValueLength" Immediate="true" AutoFocus="true" />
+        </form>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="value-form" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@(!IsValid)">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string _text = "";
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = null!;
+
+    [Parameter]
+    public string Value { get; set; } = "";
+
+    private bool IsValid => !string.IsNullOrWhiteSpace(_text);
+
+    public static async Task<string?> ShowAsync(IDialogService dialogs, string title, string value = "")
+    {
+        var parameters = new DialogParameters { { nameof(Value), value } };
+        var dialog = await dialogs.ShowAsync<ValueDialog>(title, parameters);
+        var result = await dialog.Result;
+        return result is { Canceled: false, Data: string text } ? text : null;
+    }
+
+    protected override void OnInitialized() => _text = Value;
+
+    private void Submit()
+    {
+        if (IsValid)
+            Dialog.Close(DialogResult.Ok(_text.Trim()));
+    }
+}

@@ -1,0 +1,13 @@
+.tree-card {
+    height: 100%;
+}
+
+.tree-card .mud-card-content {
+    max-height: calc(100vh - 200px);
+    overflow: auto;
+}
+
+.deleted {
+    text-decoration: line-through;
+    opacity: .5;
+}

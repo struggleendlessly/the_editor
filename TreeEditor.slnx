@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TreeEditor.Api/TreeEditor.Api.csproj" />
+    <Project Path="src/TreeEditor.Client/TreeEditor.Client.csproj" />
+    <Project Path="src/TreeEditor.Contracts/TreeEditor.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TreeEditor.Tests/TreeEditor.Tests.csproj" />
+  </Folder>
+</Solution>

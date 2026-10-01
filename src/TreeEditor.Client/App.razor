@@ -1,0 +1,71 @@
+@inject TreeApi Api
+@inject TreeCache Cache
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider MaxWidth="MaxWidth.ExtraSmall" FullWidth="true" CloseOnEscapeKey="true" />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-3" />
+        <MudText Typo="Typo.h6">Tree Editor</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Inherit" StartIcon="@Icons.Material.Filled.RestartAlt" OnClick="ResetAsync">Reset</MudButton>
+    </MudAppBar>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+            <ErrorBoundary @ref="_errors">
+                <ChildContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <DbTreeView @ref="_dbTree" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <CachedTreeView Applied="ReloadDatabaseTreeAsync" />
+                        </MudItem>
+                    </MudGrid>
+                </ChildContent>
+                <ErrorContent>
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined">
+                        <MudText Typo="Typo.body1">The server could not complete the request. Make sure the database is running.</MudText>
+                        <MudButton Color="Color.Error" Class="mt-2" OnClick="() => _errors.Recover()">Try again</MudButton>
+                    </MudAlert>
+                </ErrorContent>
+            </ErrorBoundary>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private ErrorBoundary _errors = null!;
+    private DbTreeView _dbTree = null!;
+
+    private async Task ResetAsync()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Reset",
+            "Restore the database to the sample data and clear the cache?",
+            yesText: "Reset",
+            cancelText: "Cancel");
+
+        if (confirmed != true)
+            return;
+
+        try
+        {
+            await Api.ResetAsync();
+            Cache.Clear();
+            _errors.Recover();
+            await ReloadDatabaseTreeAsync();
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Reset failed. Make sure the database is running.", Severity.Error);
+        }
+    }
+
+    private Task ReloadDatabaseTreeAsync() => _dbTree.ReloadAsync();
+}

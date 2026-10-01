@@ -1,0 +1,74 @@
+@inject TreeApi Api
+@inject TreeCache Cache
+
+<MudCard Class="tree-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Database</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Children are fetched on expand</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" EndIcon="@Icons.Material.Filled.KeyboardDoubleArrowRight"
+                       Disabled="@(!CanLoad)" OnClick="LoadSelectedAsync">
+                Load
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudTreeView @key="_version" T="NodeDto" Items="_roots" ServerData="LoadChildrenAsync"
+                     @bind-SelectedValue="_selected" Hover="true" Dense="true">
+            <ItemTemplate>
+                <MudTreeViewItem Value="context.Value"
+                                 Text="@context.Text"
+                                 TextClass="@(context.Value!.IsDeleted ? "deleted" : null)"
+                                 CanExpand="context.Expandable"
+                                 @bind-Items="context.Children"
+                                 @bind-Expanded="context.Expanded" />
+            </ItemTemplate>
+        </MudTreeView>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private IReadOnlyCollection<TreeItemData<NodeDto>> _roots = [];
+    private NodeDto? _selected;
+    private int _version;
+
+    private bool CanLoad => _selected is not null && !Cache.Contains(_selected.Id);
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+
+    public async Task ReloadAsync()
+    {
+        var expanded = ExpandedItems(_roots).Select(item => item.Value!.Id).ToHashSet();
+        _roots = await LoadItemsAsync(null, expanded);
+        _selected = null;
+        _version++;
+        StateHasChanged();
+    }
+
+    private Task<IReadOnlyCollection<TreeItemData<NodeDto>>> LoadChildrenAsync(NodeDto? parent) =>
+        LoadItemsAsync(parent?.Id, new HashSet<Guid>());
+
+    private async Task<IReadOnlyCollection<TreeItemData<NodeDto>>> LoadItemsAsync(Guid? parentId, IReadOnlySet<Guid> expanded)
+    {
+        var nodes = await Api.GetChildrenAsync(parentId);
+        var items = nodes
+            .OrderBy(n => n.Value, TreeCache.ByValue)
+            .Select(n => new TreeItemData<NodeDto> { Value = n, Text = n.Value, Expandable = n.HasChildren })
+            .ToList();
+
+        foreach (var item in items.Where(i => expanded.Contains(i.Value!.Id) && i.Expandable))
+        {
+            item.Children = await LoadItemsAsync(item.Value!.Id, expanded);
+            item.Expanded = true;
+        }
+
+        return items;
+    }
+
+    private static IEnumerable<ITreeItemData<NodeDto>> ExpandedItems(IEnumerable<ITreeItemData<NodeDto>> items) =>
+        items.Where(i => i.Expanded).SelectMany(i => ExpandedItems(i.Children ?? []).Prepend(i));
+
+    private async Task LoadSelectedAsync() => Cache.Load(await Api.GetNodeAsync(_selected!.Id));
+}

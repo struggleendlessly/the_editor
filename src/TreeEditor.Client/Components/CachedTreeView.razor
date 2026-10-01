@@ -1,0 +1,88 @@
+@implements IDisposable
+@inject TreeApi Api
+@inject TreeCache Cache
+@inject IDialogService Dialogs
+
+<MudCard Class="tree-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Cache</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Changes stay local until applied</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudButton StartIcon="@Icons.Material.Outlined.Add" Disabled="@(!CanEdit)" OnClick="AddChildAsync">Add</MudButton>
+            <MudButton StartIcon="@Icons.Material.Outlined.Edit" Disabled="@(!CanEdit)" OnClick="RenameAsync">Edit</MudButton>
+            <MudButton StartIcon="@Icons.Material.Outlined.Delete" Disabled="@(!CanEdit)" OnClick="Delete">Delete</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-2"
+                       Disabled="@(!Cache.HasChanges || _applying)" OnClick="ApplyAsync">
+                Apply
+            </MudButton>
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (Cache.IsEmpty)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                Select a node in the database tree and load it here.
+            </MudText>
+        }
+        <MudTreeView T="CachedNode" @bind-SelectedValue="_selected" Hover="true" Dense="true">
+            @foreach (var node in Cache.Roots)
+            {
+                <CachedNodeItem @key="node.Id" Node="node" />
+            }
+        </MudTreeView>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private CachedNode? _selected;
+    private bool _applying;
+
+    [Parameter]
+    public EventCallback Applied { get; set; }
+
+    private bool CanEdit => _selected is { IsDeleted: false };
+
+    protected override void OnInitialized() => Cache.Changed += OnCacheChanged;
+
+    public void Dispose() => Cache.Changed -= OnCacheChanged;
+
+    private void OnCacheChanged()
+    {
+        if (_selected is not null && !Cache.Contains(_selected.Id))
+            _selected = null;
+
+        StateHasChanged();
+    }
+
+    private async Task AddChildAsync()
+    {
+        var parent = _selected!;
+        if (await ValueDialog.ShowAsync(Dialogs, "Add child") is { } value)
+            Cache.AddChild(parent, value);
+    }
+
+    private async Task RenameAsync()
+    {
+        var node = _selected!;
+        if (await ValueDialog.ShowAsync(Dialogs, "Edit value", node.Value) is { } value)
+            Cache.Rename(node, value);
+    }
+
+    private void Delete() => Cache.Delete(_selected!);
+
+    private async Task ApplyAsync()
+    {
+        _applying = true;
+        try
+        {
+            Cache.Refresh(await Api.ApplyAsync(Cache.GetChanges()));
+            await Applied.InvokeAsync();
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+}

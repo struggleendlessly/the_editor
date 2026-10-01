@@ -1,0 +1,48 @@
+@inject TreeCache Cache
+
+<MudTreeViewItem Value="Node"
+                 Text="@Node.Value"
+                 TextClass="@(Node.IsDeleted ? "deleted" : null)"
+                 EndText="@StateText"
+                 EndTextTypo="Typo.caption"
+                 EndTextClass="@StateClass"
+                 Expanded="true"
+                 ChildContent="@Children" />
+
+@code {
+    [Parameter, EditorRequired]
+    public CachedNode Node { get; set; } = null!;
+
+    private RenderFragment? Children
+    {
+        get
+        {
+            var children = Cache.ChildrenOf(Node).ToList();
+            if (children.Count == 0)
+                return null;
+
+            return @<text>
+                @foreach (var child in children)
+                {
+                    <CachedNodeItem @key="child.Id" Node="child" />
+                }
+            </text>;
+        }
+    }
+
+    private string? StateText => Node.State switch
+    {
+        NodeState.Added => "new",
+        NodeState.Modified => "edited",
+        NodeState.Deleted => "deleted",
+        _ => null
+    };
+
+    private string? StateClass => Node.State switch
+    {
+        NodeState.Added => "mud-success-text",
+        NodeState.Modified => "mud-warning-text",
+        NodeState.Deleted => "mud-error-text",
+        _ => null
+    };
+}
